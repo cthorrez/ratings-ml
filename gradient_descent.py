@@ -20,11 +20,33 @@ def logistic_likelihood(ratings, matchups, outcomes, alpha=math.log(10.0) / 400.
     return -jnp.log((outcomes * probs) + ((1.0 - outcomes) * (1.0 - probs))).sum() / alpha
 
 
+@jax.jit
+def cauchy_predict(ratings, matchups):
+    matchup_ratings = ratings[matchups]
+    rating_diffs = matchup_ratings[:, 0] - matchup_ratings[:, 1]
+    probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    return probs
+
+@jax.jit
+def cauchy_likelihood(ratings, matchups, outcomes, alpha=math.log(10.0) / 400.0):
+    matchup_ratings = ratings[matchups]
+    rating_diffs = matchup_ratings[:, 0] - matchup_ratings[:, 1]
+    probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    return -jnp.log((outcomes * probs) + ((1.0 - outcomes) * (1.0 - probs))).sum() / alpha
+
+
 def main():
     dataset, test_mask = load_dataset('league_of_legends', test_start_date='2023-03-31')
     print(len(dataset), test_mask.sum())
 
-    rating_system = AutogradRatingSystem(dataset.competitors, update_method='batched')
+    rating_system = AutogradRatingSystem(
+        dataset.competitors,
+        predict_fn=cauchy_predict,
+        likelihood_fn=cauchy_likelihood,
+        initial_rating=0.0,
+        learning_rate=0.01,
+        update_method='batched'
+    )
 
     metrics = evaluate(rating_system, dataset, test_mask)
     print(metrics)
