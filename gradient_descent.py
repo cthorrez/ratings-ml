@@ -1,7 +1,7 @@
 import math
 import jax
 import jax.numpy as jnp
-from jax.scipy.stats import norm
+from jax.scipy.stats import norm, cauchy, logistic
 from riix.models.autograd_rating_system import AutogradRatingSystem
 from riix.models.elo import Elo
 from riix.eval import evaluate
@@ -11,14 +11,16 @@ from data_utils import load_dataset
 def logistic_predict(ratings, matchups):
     matchup_ratings = ratings[matchups]
     neg_rating_diffs = matchup_ratings[:, 1] - matchup_ratings[:, 0]
-    probs = jax.nn.sigmoid(neg_rating_diffs)
+    # probs = jax.nn.sigmoid(neg_rating_diffs)
+    probs = logistic.cdf(neg_rating_diffs)
     return probs
 
 @jax.jit
 def logistic_likelihood(ratings, matchups, outcomes):
     matchup_ratings = ratings[matchups]
     neg_rating_diffs = matchup_ratings[:, 1] - matchup_ratings[:, 0]
-    probs = jax.nn.sigmoid(neg_rating_diffs)
+    # probs = jax.nn.sigmoid(neg_rating_diffs)
+    probs = logistic.cdf(neg_rating_diffs)
     return -jnp.log((outcomes * probs) + ((1.0 - outcomes) * (1.0 - probs))).sum()
 
 
@@ -26,14 +28,16 @@ def logistic_likelihood(ratings, matchups, outcomes):
 def cauchy_predict(ratings, matchups):
     matchup_ratings = ratings[matchups]
     rating_diffs = matchup_ratings[:, 0] - matchup_ratings[:, 1]
-    probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    # probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    probs = cauchy.cdf(rating_diffs)
     return probs
 
 @jax.jit
 def cauchy_likelihood(ratings, matchups, outcomes):
     matchup_ratings = ratings[matchups]
     rating_diffs = matchup_ratings[:, 0] - matchup_ratings[:, 1]
-    probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    # probs = (1.0 / jnp.pi) * jnp.arctan(rating_diffs) + 0.5
+    probs = cauchy.cdf(rating_diffs)
     return -jnp.log((outcomes * probs) + ((1.0 - outcomes) * (1.0 - probs))).sum()
 
 @jax.jit
