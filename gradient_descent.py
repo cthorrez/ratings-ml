@@ -1,58 +1,61 @@
-import math
-import jax
-import jax.numpy as jnp
-from jax.scipy.stats import norm, cauchy, logistic
+import numpy as np
+import matplotlib.pyplot as plt
 from riix.models.autograd_rating_system import AutogradRatingSystem
-from riix.models.elo import Elo
 from riix.eval import evaluate
 from data_utils import load_dataset
+from jax.scipy.stats import norm, cauchy, logistic, laplace
 
+def hyperparameter_sweep(dataset, test_mask, cdf, num_points=20):
+    # Create logarithmically spaced values for scale and learning rate
+    scales = np.logspace(-3, 1, num_points)
+    learning_rates = np.logspace(-3, 1, num_points)
+    
+    # Initialize the results matrix
+    results = np.zeros((num_points, num_points))
+    
+    for i, scale in enumerate(scales):
+        for j, lr in enumerate(learning_rates):
+            rs = AutogradRatingSystem(
+                dataset.competitors,
+                cdf=cdf,
+                initial_rating=0.0,
+                learning_rate=lr,
+                scale=scale,
+                update_method='batched'
+            )
+            metrics = evaluate(rs, dataset, test_mask)
+            results[i, j] = metrics['log_loss']
+    
+    return results, scales, learning_rates
+
+def plot_heatmap(results, scales, learning_rates, title):
+    plt.figure(figsize=(10, 8))
+    plt.imshow(results, cmap='coolwarm', aspect='auto', origin='lower', extent=[np.log10(learning_rates[0]), np.log10(learning_rates[-1]), np.log10(scales[0]), np.log10(scales[-1])])
+    plt.colorbar(label='Log Loss')
+    plt.xlabel('Log10(Learning Rate)')
+    plt.ylabel('Log10(Scale)')
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(f"{title.lower().replace(' ', '_')}_heatmap.png")
+    plt.close()
 
 def main():
     dataset, test_mask = load_dataset('league_of_legends', test_start_date='2023-03-31')
-    print(len(dataset), test_mask.sum())
+    print(f"Dataset size: {len(dataset)}, Test set size: {test_mask.sum()}")
 
-    logistic_rs = AutogradRatingSystem(
-        dataset.competitors,
-        cdf=logistic.cdf,
-        initial_rating=0.0,
-        learning_rate=0.2,
-        scale=1.0,
-        update_method='batched'
-    )
-    logistic_metrics = evaluate(logistic_rs, dataset, test_mask)
-    print('logistic')
-    print(logistic_metrics)
+    # List of distributions to test
+    distributions = [
+        ('Logistic', logistic.cdf),
+        ('Cauchy', cauchy.cdf),
+        ('Gaussian', norm.cdf),
+        ('Laplace', laplace.cdf)
+    ]
 
-    cauchy_rs = AutogradRatingSystem(
-        dataset.competitors,
-        cdf=cauchy.cdf,
-        initial_rating=0.0,
-        learning_rate=0.2,
-        scale=1.0,
-        update_method='batched'
-    )
-    cauchy_metrics = evaluate(cauchy_rs, dataset, test_mask)
-    print('cauchy')
-    print(cauchy_metrics)
-
-    gaussian_rs = AutogradRatingSystem(
-        dataset.competitors,
-        cdf=norm.cdf,
-        initial_rating=0.0,
-        learning_rate=0.2,
-        scale=1.0,
-        update_method='batched'
-    )
-    gaussian_metrics = evaluate(gaussian_rs, dataset, test_mask)
-    print('gaussian')
-    print(gaussian_metrics)
-
-    elo = Elo(competitors=dataset.competitors, update_method='batched')
-    elo_metrics = evaluate(elo, dataset, test_mask)
-    print('elo')
-    print(elo_metrics)
-
+    for dist_name, cdf in distributions:
+        print(f"Running hyperparameter sweep for {dist_name} distribution...")
+        results, scales, learning_rates = hyperparameter_sweep(dataset, test_mask, cdf)
+        plot_heatmap(results, scales, learning_rates, f"{dist_name} Distribution Hyperparameter Sweep")
+        print(f"Heatmap saved as {dist_name.lower()}_distribution_hyperparameter_sweep.png")
 
 if __name__ == '__main__':
     main()
