@@ -24,13 +24,13 @@ def evaluate_single_point(args):
     print(f'scale: {scale}, lr: {lr}, log loss: {log_loss}')
     return log_loss
 
-def hyperparameter_sweep(dataset, test_mask, cdf, num_points=10):
-    scales = np.linspace(1.0, 500.0, num_points)
-    learning_rates = np.logspace(-3, 1, num_points)
+def hyperparameter_sweep(dataset, test_mask, cdf, num_points=8):
+    scales = np.logspace(-1, math.log10(200.0), num_points)
+    learning_rates = np.logspace(-2, 2, num_points)
     
     args_list = [(dataset, test_mask, cdf, scale, lr) for scale in scales for lr in learning_rates]
     
-    with mp.Pool(processes=16) as pool:
+    with mp.Pool(processes=8) as pool:
         results = pool.map(evaluate_single_point, args_list)
     
     results = np.array(results).reshape(num_points, num_points)
@@ -39,7 +39,7 @@ def hyperparameter_sweep(dataset, test_mask, cdf, num_points=10):
 
 def plot_heatmap(results, scales, learning_rates, title):
     plt.figure(figsize=(10, 8))
-    plt.imshow(results, cmap='coolwarm', aspect='auto', origin='lower', extent=[np.log10(learning_rates[0]), np.log10(learning_rates[-1]), scales[0], scales[-1]])
+    plt.imshow(results, cmap='coolwarm', aspect='auto', origin='lower', extent=[np.log10(learning_rates[0]), np.log10(learning_rates[-1]), np.log10(scales[0]), np.log10(scales[-1])])
     plt.colorbar(label='Log Loss')
     plt.xlabel('Log10(Learning Rate)')
     plt.ylabel('Scale')
@@ -49,7 +49,9 @@ def plot_heatmap(results, scales, learning_rates, title):
     plt.close()
 
 def main():
-    dataset, test_mask = load_dataset('tetris', test_start_date='2023-06-30')
+    # dataset, test_mask = load_dataset('tetris', test_start_date='2023-06-30')
+    dataset, test_mask = load_dataset('league_of_legends', test_start_date='2023-06-30')
+
     print(f"Dataset size: {len(dataset)}, Test set size: {test_mask.sum()}")
 
     distributions = [
