@@ -21,13 +21,13 @@ def evaluate_single_point(args):
     )
     metrics = evaluate(rs, dataset, test_mask)
     log_loss = metrics['log_loss']
-    print(f'scale: {scale}, lr: {lr}, log loss: {log_loss}')
+    # print(f'scale: {scale}, lr: {lr}, log loss: {log_loss}')
     del rs
     jax.clear_caches()
     gc.collect()
     return log_loss
 
-def hyperparameter_sweep(dataset, test_mask, cdf, num_points=12):
+def hyperparameter_sweep(dataset, test_mask, cdf, num_points=10):
     scales = np.logspace(-1, math.log10(200.0), num_points)
     learning_rates = np.logspace(-2, 2, num_points)
     
@@ -36,7 +36,7 @@ def hyperparameter_sweep(dataset, test_mask, cdf, num_points=12):
     with mp.Pool(processes=6) as pool:
         results = pool.map(evaluate_single_point, args_list)
     
-    results = np.array(results).reshape(num_points, num_points)    
+    results = np.array(results).reshape(num_points, num_points)
     return results, scales, learning_rates
 
 def plot_heatmap(results, scales, learning_rates, title):
@@ -47,18 +47,18 @@ def plot_heatmap(results, scales, learning_rates, title):
     plt.ylabel('Scale')
     plt.title(title)
     plt.tight_layout()
-    plt.savefig(f"{title.lower().replace(' ', '_')}_heatmap_2.png")
+    plt.savefig(f"{title.lower().replace(' ', '_')}_heatmap.png")
     plt.close()
 
 def main():
-    # dataset, test_mask = load_dataset('tetris', test_start_date='2023-06-30')
-    dataset, test_mask = load_dataset('league_of_legends', test_start_date='2023-06-30')
+    dataset, test_mask = load_dataset('tetris', test_start_date='2023-06-30')
+    # dataset, test_mask = load_dataset('league_of_legends', test_start_date='2023-06-30')
 
     print(f"Dataset size: {len(dataset)}, Test set size: {test_mask.sum()}")
 
     distributions = [
-        # ('Logistic', logistic.cdf),
-        # ('Cauchy', cauchy.cdf),
+        ('Logistic', logistic.cdf),
+        ('Cauchy', cauchy.cdf),
         ('Gaussian', norm.cdf),
         ('Laplace', laplace.cdf)
     ]
@@ -66,6 +66,8 @@ def main():
     for dist_name, cdf in distributions:
         print(f"Running hyperparameter sweep for {dist_name} distribution...")
         results, scales, learning_rates = hyperparameter_sweep(dataset, test_mask, cdf)
+        best_result = np.nanmin(results)
+        print(f'best log loss: {best_result}')
         plot_heatmap(results, scales, learning_rates, f"{dist_name} Distribution Hyperparameter Sweep")
         print(f"Heatmap saved as {dist_name.lower()}_distribution_hyperparameter_sweep.png")
         
